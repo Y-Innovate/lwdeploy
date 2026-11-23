@@ -1,0 +1,149 @@
+-- Create mailqueue table in lwd database.
+
+-- Set SQLID
+   SET CURRENT SQLID='{{SQLID}}';
+
+-- Create mailqueue tablespace
+   CREATE TABLESPACE {{MAILQUEUE_TBSNAME}}
+                       IN {{DBNAME}}
+                       USING STOGROUP {{STOGROUP}}
+                       PRIQTY 40 SECQTY 40
+                       ERASE  NO
+                       FREEPAGE 0 PCTFREE 5 FOR UPDATE 0
+                       GBPCACHE CHANGED
+                       TRACKMOD YES
+                       MAXPARTITIONS 254
+                       LOGGED
+                       DSSIZE 4 G
+                       SEGSIZE 4
+                       BUFFERPOOL BP0
+                       LOCKSIZE ANY
+                       LOCKMAX SYSTEM
+                       CLOSE YES
+                       COMPRESS NO
+                       CCSID      UNICODE
+                       DEFINE YES
+                       MAXROWS 255
+                       INSERT ALGORITHM 0;
+
+-- Create mailqueue table
+   CREATE TABLE {{SCHEMA}}.{{MAILQUEUE_TBNAME}}
+      (MAILID      INTEGER NOT NULL GENERATED ALWAYS
+          AS IDENTITY
+             (START WITH 1, INCREMENT BY 1, CACHE 20, NO CYCLE,
+              NO ORDER, MAXVALUE 2147483647, MINVALUE 1),
+       USERID      GRAPHIC(8) NOT NULL,
+       EMAIL       VARGRAPHIC(254) NOT NULL,
+       DEPLID      INTEGER,
+       MAILTYPE    GRAPHIC(1) NOT NULL,
+       SUBJECT     VARGRAPHIC(100) NOT NULL,
+       BODY        VARGRAPHIC(1000) NOT NULL,
+       MAILSTATUS  GRAPHIC(1) NOT NULL,
+       ATTEMPTS    SMALLINT NOT NULL,
+       SENTDATE    TIMESTAMP,
+       CREATEDBY   GRAPHIC(8) NOT NULL,
+       CREATEDDATE TIMESTAMP NOT NULL,
+       UPDATEDBY   GRAPHIC(8) NOT NULL,
+       UPDATEDDATE TIMESTAMP NOT NULL,
+       CONSTRAINT MAILQUEUEKEY
+       PRIMARY KEY (MAILID))
+      IN {{DBNAME}}.{{MAILQUEUE_TBSNAME}}
+      PARTITION BY SIZE
+      AUDIT NONE
+      DATA CAPTURE NONE
+      CCSID      UNICODE
+      NOT VOLATILE
+      APPEND NO;
+
+-- Create mailqueue index for primary key
+   CREATE UNIQUE INDEX {{SCHEMA}}.{{MAILQUEUE_IXNAME1}}
+      ON {{SCHEMA}}.{{MAILQUEUE_TBNAME}}
+      (MAILID ASC)
+     USING STOGROUP {{STOGROUP}}
+     PRIQTY -1 SECQTY -1
+     ERASE  NO
+     FREEPAGE 0 PCTFREE 10
+     GBPCACHE CHANGED
+     NOT CLUSTER
+     COMPRESS NO
+     INCLUDE NULL KEYS
+     BUFFERPOOL BP0
+     CLOSE NO
+     COPY NO
+     DEFER NO
+     DEFINE YES
+     PIECESIZE 2 G;
+
+-- Create mailqueue index on MAILSTATUS, CREATEDDATE
+   CREATE INDEX {{SCHEMA}}.{{MAILQUEUE_IXNAME2}}
+      ON {{SCHEMA}}.{{MAILQUEUE_TBNAME}}
+      (MAILSTATUS  ASC,
+       CREATEDDATE ASC)
+     USING STOGROUP {{STOGROUP}}
+     PRIQTY -1 SECQTY -1
+     ERASE  NO
+     FREEPAGE 0 PCTFREE 10
+     GBPCACHE CHANGED
+     NOT CLUSTER
+     COMPRESS NO
+     INCLUDE NULL KEYS
+     BUFFERPOOL BP0
+     CLOSE NO
+     COPY NO
+     DEFER NO
+     DEFINE YES
+     PIECESIZE 2 G;
+
+-- Create mailqueue index on USERID
+   CREATE INDEX {{SCHEMA}}.{{MAILQUEUE_IXNAME3}}
+      ON {{SCHEMA}}.{{MAILQUEUE_TBNAME}}
+      (USERID ASC)
+     USING STOGROUP {{STOGROUP}}
+     PRIQTY -1 SECQTY -1
+     ERASE  NO
+     FREEPAGE 0 PCTFREE 10
+     GBPCACHE CHANGED
+     NOT CLUSTER
+     COMPRESS NO
+     INCLUDE NULL KEYS
+     BUFFERPOOL BP0
+     CLOSE NO
+     COPY NO
+     DEFER NO
+     DEFINE YES
+     PIECESIZE 2 G;
+
+-- Create mailqueue index on DEPLID
+   CREATE INDEX {{SCHEMA}}.{{MAILQUEUE_IXNAME4}}
+      ON {{SCHEMA}}.{{MAILQUEUE_TBNAME}}
+      (DEPLID ASC)
+     USING STOGROUP {{STOGROUP}}
+     PRIQTY -1 SECQTY -1
+     ERASE  NO
+     FREEPAGE 0 PCTFREE 10
+     GBPCACHE CHANGED
+     NOT CLUSTER
+     COMPRESS NO
+     INCLUDE NULL KEYS
+     BUFFERPOOL BP0
+     CLOSE NO
+     COPY NO
+     DEFER NO
+     DEFINE YES
+     PIECESIZE 2 G;
+
+-- Create foreign key on USERID
+   ALTER TABLE {{SCHEMA}}.{{MAILQUEUE_TBNAME}}
+     FOREIGN KEY MAILQU_FK1 (USERID)
+     REFERENCES {{SCHEMA}}.{{USERS_TBNAME}}
+       (USERID)
+     ON DELETE RESTRICT ENFORCED;
+
+-- Create foreign key on DEPLID
+   ALTER TABLE {{SCHEMA}}.{{MAILQUEUE_TBNAME}}
+     FOREIGN KEY MAILQU_FK2 (DEPLID)
+     REFERENCES {{SCHEMA}}.{{DEPLOYMENTS_TBNAME}}
+       (DEPLID)
+     ON DELETE RESTRICT ENFORCED;
+
+   COMMIT;

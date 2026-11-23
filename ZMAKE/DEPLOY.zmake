@@ -1,0 +1,120 @@
+#* Deploy lwd repository
+
+#* Source and target libs
+srcdbrmlib    := $(srchlq).DBRM
+tgtdbrmlib    := $(tgthlq).DBRM
+
+srcloadlib    := $(srchlq).LOAD
+tgtloadlib    := $(tgthlq).LOAD
+
+tgtddllib     := $(tgthlq).DDL
+tgtjcllib     := $(tgthlq).JCL
+tgtexeclib    := $(tgthlq).EXEC
+
+ddldir        := $(gitdir)/DDL
+ddlfiles      := ${sh cd $(gitdir)/DDL; +
+                      find * -prune -type f -name "*.sql" 2>&1 | +
+                      grep -v EDC5129I}
+ddlmems       := ${stripext $(ddlfiles)}
+ddltgts       := ${addpdsname $(tgtddllib),$(ddlmems)}
+
+jcldir        := $(gitdir)/JCL
+jclfiles      := ${sh cd $(gitdir)/JCL; +
+                      find * -prune -type f -name "*.jcl" 2>&1 | +
+                      grep -v EDC5129I}
+jclmems       := ${stripext $(jclfiles)}
+jcltgts       := ${addpdsname $(tgtjcllib),$(jclmems)}
+
+#* REXX of the output collector (JCL/LWDTICK) and of the result step
+#* (LWDR916, in every deployment job): copied as is
+rexxdir       := $(gitdir)/REXX
+rexxfiles     := ${sh cd $(gitdir)/REXX; +
+                      find * -prune -type f -name "*.rexx" 2>&1 | +
+                      grep -v EDC5129I}
+rexxmems      := ${stripext $(rexxfiles)}
+rexxtgts      := ${addpdsname $(tgtexeclib),$(rexxmems)}
+
+dbrmmems      := ${memberlist $(srcdbrmlib)}
+dbrmtgts      := ${addpdsname $(tgtdbrmlib),$(dbrmmems)}
+
+#* LWD has one plan and one collection: there are no public paths.
+#* Every LWDM module is bound into it; the rest is only copied.
+loadmems      := ${memberlist $(srcloadlib)}
+loaddb2mems   := ${memberlist $(srcloadlib),LWDM}
+loadothmems   := ${function NOTIN SET1($(loadmems))+
+                                  SET2($(loaddb2mems))}
+loaddb2tgts   := ${addpdsname $(tgtloadlib),$(loaddb2mems)}
+loadothtgts   := ${addpdsname $(tgtloadlib),$(loadothmems)}
+
+#* The code of the scheduled tick (JCL/LWDTICK): not secret, so in a
+#* directory the deployer writes and the scheduler's userid reads. Its
+#* configuration and credentials stay in the scheduler's home.
+tickfiles     := tick.py tick.sh Globals.py MyRequests.py
+
+#* Data sets grouped by characteristics
+recfmFB80     := $(tgtddllib) $(tgtjcllib) $(tgtdbrmlib) $(tgtexeclib)
+recfmU        := $(tgtloadlib)
+
+datasets      := $(recfmFB80) $(recfmU)
+
+#* Combine targets
+#* Only DDL and JCL, for when the tables must change before a BIND
+.PHONY DEPLOY_DDL
+DEPLOY_DDL : $(recfmFB80) $(ddltgts) $(jcltgts)
+
+.PHONY DEPLOY_ALL
+DEPLOY_ALL : $(datasets) $(ddltgts) $(jcltgts) $(dbrmtgts)+
+             $(loaddb2tgts) $(loadothtgts) $(rexxtgts) DEPLOY_TICK
+
+#* Only the tick's code
+.PHONY DEPLOY_TICK
+DEPLOY_TICK :
+- CALL UNIXCMD0 mkdir -p $(tickdir)
+- CALL UNIXCMD0 cd $(gitdir)/python; cp $(tickfiles) $(tickdir)
+- CALL UNIXCMD0 cd $(tickdir); chmod 755 $(tickfiles)
+
+#* Build targets
+$(ddltgts) : $(gitdir)/DDL/$%.sql
+- CALL UNIXCMD0 $(gitdir)/python/profileUSS.sh $(gitdir)/DDL $%.sql+
+-               $(gitdir)/envs/$(envl).yaml | +
+-               iconv -f 1047 -t 037 -T > /tmp/$%.sql
+- CALL OGETU '/tmp/$%.sql' '$@'
+- CALL UNIXCMD0 rm /tmp/$%.sql
+
+$(jcltgts) : $(gitdir)/JCL/$%.jcl
+- CALL UNIXCMD0 $(gitdir)/python/profileUSS.sh $(gitdir)/JCL $%.jcl+
+-               $(gitdir)/envs/$(envl).yaml | +
+-               iconv -f 1047 -t 037 -T > /tmp/$%.jcl
+- CALL OGETU '/tmp/$%.jcl' '$@'
+- CALL UNIXCMD0 rm /tmp/$%.jcl
+
+$(rexxtgts) : $(rexxdir)/$%.rexx
+- CALL OGETU '$(rexxdir)/$%.rexx' '$@' ISO88591
+
+$(dbrmtgts) : $(srcdbrmlib)($%)
+- CALL IEBCOPY PDSIN($(srcdbrmlib)) PDSOUT($(tgtdbrmlib))+
+-              MEMBER($%) PRINTSUCCESS(NO)
+
+$(loadothtgts) : $(srcloadlib)($%)
+- CALL IEBCOPY PDSIN($(srcloadlib)) PDSOUT($(tgtloadlib))+
+-              MEMBER($%) PRINTSUCCESS(NO)
+
+$(loaddb2tgts) : $(srcloadlib)($%)
+- CALL IEBCOPY PDSIN($(srcloadlib)) PDSOUT($(tgtloadlib))+
+-              MEMBER($%) PRINTSUCCESS(NO)
+- CALL BIND SYSTEM(DBY1) PACKAGE(LWD$(lwddb)) MEMBER($%)+
+-           OWNER(LWD$(lwddb)) QUALIFIER(LWD$(lwddb))+
+-           LIBRARY('$(tgtdbrmlib)')
+
+#* Allocate LRECL=80 RECFM=FB data sets
+$(recfmFB80) :
+- CALL TSOCMD ALLOC DATASET('$@') NEW RECFM(F,B) LRECL(80)+
+-             CYLINDERS SPACE(1,1) DSORG(PO) DSNTYPE(LIBRARY)
+- CALL TSOCMD FREE DATASET('$@')
+
+#* Allocate LRECL=0 RECFM=U data sets
+$(recfmU) :
+- CALL TSOCMD ALLOC DATASET('$@') NEW RECFM(U) LRECL(0)+
+-             BLKSIZE(32760) CYLINDERS SPACE(1,1) DSORG(PO)+
+-             DSNTYPE(LIBRARY)
+- CALL TSOCMD FREE DATASET('$@')

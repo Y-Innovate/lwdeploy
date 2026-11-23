@@ -1,0 +1,110 @@
+-- Create depljobs table in lwd database.
+
+-- Set SQLID
+   SET CURRENT SQLID='{{SQLID}}';
+
+-- Create depljobs tablespace
+   CREATE TABLESPACE {{DEPLJOBS_TBSNAME}}
+                       IN {{DBNAME}}
+                       USING STOGROUP {{STOGROUP}}
+                       PRIQTY 40 SECQTY 40
+                       ERASE  NO
+                       FREEPAGE 0 PCTFREE 5 FOR UPDATE 0
+                       GBPCACHE CHANGED
+                       TRACKMOD YES
+                       MAXPARTITIONS 254
+                       LOGGED
+                       DSSIZE 4 G
+                       SEGSIZE 4
+                       BUFFERPOOL BP0
+                       LOCKSIZE ANY
+                       LOCKMAX SYSTEM
+                       CLOSE YES
+                       COMPRESS NO
+                       CCSID      UNICODE
+                       DEFINE YES
+                       MAXROWS 255
+                       INSERT ALGORITHM 0;
+
+-- Create depljobs table
+   CREATE TABLE {{SCHEMA}}.{{DEPLJOBS_TBNAME}}
+      (DEPLID      INTEGER NOT NULL,
+       JOBNO       SMALLINT NOT NULL,
+       TEMPLATEID  INTEGER NOT NULL,
+       TEMPLATEREV SMALLINT NOT NULL,
+       JOBTITLE    VARGRAPHIC(60) NOT NULL,
+       MAXRC       SMALLINT NOT NULL,
+       JOBSTATUS   GRAPHIC(1) NOT NULL,
+       LINECOUNT   SMALLINT NOT NULL,
+       LASTRUNID   INTEGER,
+       SKIPREASON  VARGRAPHIC(255),
+       CREATEDBY   GRAPHIC(8) NOT NULL,
+       CREATEDDATE TIMESTAMP NOT NULL,
+       UPDATEDBY   GRAPHIC(8) NOT NULL,
+       UPDATEDDATE TIMESTAMP NOT NULL,
+       CONSTRAINT DEPLJOBSKEY
+       PRIMARY KEY (DEPLID,
+                    JOBNO))
+      IN {{DBNAME}}.{{DEPLJOBS_TBSNAME}}
+      PARTITION BY SIZE
+      AUDIT NONE
+      DATA CAPTURE NONE
+      CCSID      UNICODE
+      NOT VOLATILE
+      APPEND NO;
+
+-- Create depljobs index for primary key
+   CREATE UNIQUE INDEX {{SCHEMA}}.{{DEPLJOBS_IXNAME1}}
+      ON {{SCHEMA}}.{{DEPLJOBS_TBNAME}}
+      (DEPLID ASC,
+       JOBNO  ASC)
+     USING STOGROUP {{STOGROUP}}
+     PRIQTY -1 SECQTY -1
+     ERASE  NO
+     FREEPAGE 0 PCTFREE 10
+     GBPCACHE CHANGED
+     NOT CLUSTER
+     COMPRESS NO
+     INCLUDE NULL KEYS
+     BUFFERPOOL BP0
+     CLOSE NO
+     COPY NO
+     DEFER NO
+     DEFINE YES
+     PIECESIZE 2 G;
+
+-- Create depljobs index on TEMPLATEID, TEMPLATEREV
+   CREATE INDEX {{SCHEMA}}.{{DEPLJOBS_IXNAME2}}
+      ON {{SCHEMA}}.{{DEPLJOBS_TBNAME}}
+      (TEMPLATEID  ASC,
+       TEMPLATEREV ASC)
+     USING STOGROUP {{STOGROUP}}
+     PRIQTY -1 SECQTY -1
+     ERASE  NO
+     FREEPAGE 0 PCTFREE 10
+     GBPCACHE CHANGED
+     NOT CLUSTER
+     COMPRESS NO
+     INCLUDE NULL KEYS
+     BUFFERPOOL BP0
+     CLOSE NO
+     COPY NO
+     DEFER NO
+     DEFINE YES
+     PIECESIZE 2 G;
+
+-- Create foreign key on DEPLID
+   ALTER TABLE {{SCHEMA}}.{{DEPLJOBS_TBNAME}}
+     FOREIGN KEY DEPLJO_FK1 (DEPLID)
+     REFERENCES {{SCHEMA}}.{{DEPLOYMENTS_TBNAME}}
+       (DEPLID)
+     ON DELETE RESTRICT ENFORCED;
+
+-- Create foreign key on TEMPLATEID, TEMPLATEREV
+   ALTER TABLE {{SCHEMA}}.{{DEPLJOBS_TBNAME}}
+     FOREIGN KEY DEPLJO_FK2 (TEMPLATEID, TEMPLATEREV)
+     REFERENCES {{SCHEMA}}.{{TEMPLATEREVS_TBNAME}}
+       (TEMPLATEID, REVISION)
+     ON DELETE RESTRICT ENFORCED;
+
+   COMMIT;

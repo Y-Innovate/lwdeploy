@@ -1,0 +1,5 @@
+__pycache__/
+python/envs-tables.yaml
+python/api-tables.md
+python/runtimeTargets.yaml
+envs/*.local.yaml

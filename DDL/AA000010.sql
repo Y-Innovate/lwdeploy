@@ -1,0 +1,155 @@
+-- Create variables table in lwd database.
+
+-- Set SQLID
+   SET CURRENT SQLID='{{SQLID}}';
+
+-- Create variables tablespace
+   CREATE TABLESPACE {{VARIABLES_TBSNAME}}
+                       IN {{DBNAME}}
+                       USING STOGROUP {{STOGROUP}}
+                       PRIQTY 40 SECQTY 40
+                       ERASE  NO
+                       FREEPAGE 0 PCTFREE 5 FOR UPDATE 0
+                       GBPCACHE CHANGED
+                       TRACKMOD YES
+                       MAXPARTITIONS 254
+                       LOGGED
+                       DSSIZE 4 G
+                       SEGSIZE 4
+                       BUFFERPOOL BP0
+                       LOCKSIZE ANY
+                       LOCKMAX SYSTEM
+                       CLOSE YES
+                       COMPRESS NO
+                       CCSID      UNICODE
+                       DEFINE YES
+                       MAXROWS 255
+                       INSERT ALGORITHM 0;
+
+-- Create variables table
+   CREATE TABLE {{SCHEMA}}.{{VARIABLES_TBNAME}}
+      (VARID       INTEGER NOT NULL GENERATED ALWAYS
+          AS IDENTITY
+             (START WITH 1, INCREMENT BY 1, CACHE 20, NO CYCLE,
+              NO ORDER, MAXVALUE 2147483647, MINVALUE 1),
+       APPID       INTEGER NOT NULL,
+       ENVID       INTEGER,
+       VERSIONID   INTEGER,
+       VARNAME     VARGRAPHIC(16) NOT NULL,
+       VARVALUE    VARGRAPHIC(255) NOT NULL,
+       DESCRIPTION VARGRAPHIC(255),
+       CREATEDBY   GRAPHIC(8) NOT NULL,
+       CREATEDDATE TIMESTAMP NOT NULL,
+       UPDATEDBY   GRAPHIC(8) NOT NULL,
+       UPDATEDDATE TIMESTAMP NOT NULL,
+       CONSTRAINT VARIABLESKEY
+       PRIMARY KEY (VARID))
+      IN {{DBNAME}}.{{VARIABLES_TBSNAME}}
+      PARTITION BY SIZE
+      AUDIT NONE
+      DATA CAPTURE NONE
+      CCSID      UNICODE
+      NOT VOLATILE
+      APPEND NO;
+
+-- Create variables index for primary key
+   CREATE UNIQUE INDEX {{SCHEMA}}.{{VARIABLES_IXNAME1}}
+      ON {{SCHEMA}}.{{VARIABLES_TBNAME}}
+      (VARID ASC)
+     USING STOGROUP {{STOGROUP}}
+     PRIQTY -1 SECQTY -1
+     ERASE  NO
+     FREEPAGE 0 PCTFREE 10
+     GBPCACHE CHANGED
+     NOT CLUSTER
+     COMPRESS NO
+     INCLUDE NULL KEYS
+     BUFFERPOOL BP0
+     CLOSE NO
+     COPY NO
+     DEFER NO
+     DEFINE YES
+     PIECESIZE 2 G;
+
+-- Create variables unique index on APPID, ENVID, VERSIONID, VARNAME
+   CREATE UNIQUE INDEX {{SCHEMA}}.{{VARIABLES_IXNAME2}}
+      ON {{SCHEMA}}.{{VARIABLES_TBNAME}}
+      (APPID     ASC,
+       ENVID     ASC,
+       VERSIONID ASC,
+       VARNAME   ASC)
+     USING STOGROUP {{STOGROUP}}
+     PRIQTY -1 SECQTY -1
+     ERASE  NO
+     FREEPAGE 0 PCTFREE 10
+     GBPCACHE CHANGED
+     NOT CLUSTER
+     COMPRESS NO
+     INCLUDE NULL KEYS
+     BUFFERPOOL BP0
+     CLOSE NO
+     COPY NO
+     DEFER NO
+     DEFINE YES
+     PIECESIZE 2 G;
+
+-- Create variables index on ENVID
+   CREATE INDEX {{SCHEMA}}.{{VARIABLES_IXNAME3}}
+      ON {{SCHEMA}}.{{VARIABLES_TBNAME}}
+      (ENVID ASC)
+     USING STOGROUP {{STOGROUP}}
+     PRIQTY -1 SECQTY -1
+     ERASE  NO
+     FREEPAGE 0 PCTFREE 10
+     GBPCACHE CHANGED
+     NOT CLUSTER
+     COMPRESS NO
+     INCLUDE NULL KEYS
+     BUFFERPOOL BP0
+     CLOSE NO
+     COPY NO
+     DEFER NO
+     DEFINE YES
+     PIECESIZE 2 G;
+
+-- Create variables index on VERSIONID
+   CREATE INDEX {{SCHEMA}}.{{VARIABLES_IXNAME4}}
+      ON {{SCHEMA}}.{{VARIABLES_TBNAME}}
+      (VERSIONID ASC)
+     USING STOGROUP {{STOGROUP}}
+     PRIQTY -1 SECQTY -1
+     ERASE  NO
+     FREEPAGE 0 PCTFREE 10
+     GBPCACHE CHANGED
+     NOT CLUSTER
+     COMPRESS NO
+     INCLUDE NULL KEYS
+     BUFFERPOOL BP0
+     CLOSE NO
+     COPY NO
+     DEFER NO
+     DEFINE YES
+     PIECESIZE 2 G;
+
+-- Create foreign key on APPID
+   ALTER TABLE {{SCHEMA}}.{{VARIABLES_TBNAME}}
+     FOREIGN KEY VARIAB_FK1 (APPID)
+     REFERENCES {{SCHEMA}}.{{APPLICATIONS_TBNAME}}
+       (APPID)
+     ON DELETE RESTRICT ENFORCED;
+
+-- Create foreign key on ENVID
+   ALTER TABLE {{SCHEMA}}.{{VARIABLES_TBNAME}}
+     FOREIGN KEY VARIAB_FK2 (ENVID)
+     REFERENCES {{SCHEMA}}.{{ENVIRONMENTS_TBNAME}}
+       (ENVID)
+     ON DELETE RESTRICT ENFORCED;
+
+-- Create foreign key on VERSIONID
+   ALTER TABLE {{SCHEMA}}.{{VARIABLES_TBNAME}}
+     FOREIGN KEY VARIAB_FK3 (VERSIONID)
+     REFERENCES {{SCHEMA}}.{{VERSIONS_TBNAME}}
+       (VERSIONID)
+     ON DELETE RESTRICT ENFORCED;
+
+   COMMIT;

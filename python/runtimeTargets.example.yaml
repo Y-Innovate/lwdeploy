@@ -1,0 +1,33 @@
+# Copy to runtimeTargets.yaml and fill in.
+# Run: python python/uploadLWW.py [target]     (--list shows the targets,
+# --dry-run shows what would change, --keep keeps files on LWW that aren't here)
+
+default: dev
+
+targets:
+  # Sign in with a LWWAPI userid; the password is asked for at run time
+  dev:
+    host: https://<your_hostname>:<your_port>
+    auth: password
+    userid: <your_userid>          # optional, asked for when left out
+    # tokenPath: /LWWAPI/API/token # default
+    remoteOASDir: </path/to/openapi/docs>
+
+  # Sign in with Microsoft Entra client credentials
+  prod:
+    host: https://<your_hostname>:<your_port>
+    auth: entra
+    tokenUrl: https://login.microsoftonline.com/<your_entra_tenantid>/oauth2/v2.0/token
+    credsFile: ~/.creds            # JSON with client_id, client_secret, scope, grant_type
+    remoteOASDir: </path/to/openapi/docs>
+    # Files on LWW that uploadLWW.py must never delete, although LWWAdmin/
+    # doesn't have them (/lwdeploy/sso_config.json is kept always)
+    # keep:
+    #   - /lwdeploy/some_local_setting.json
+
+  # Optional extra headers sent with every request, e.g. behind Cloudflare Access
+  # behind-cloudflare:
+  #   host: https://<your_hostname>
+  #   auth: password
+  #   headers:
+  #     Cookie: CF_Authorization=<token>

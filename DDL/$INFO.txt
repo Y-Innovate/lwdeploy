@@ -1,0 +1,37 @@
+Member   Who When YMD Description
+-------- --- -------- --------------------------------------------------
+AA000001 BTK 26-11-12 Grant permission for CREATESG,CREATEDBA, use of
+                      bufferpools and execute on packages.
+AA000002 BTK 26-11-12 Create storage group for lwd database
+AA000003 BTK 26-11-12 Create lwd database
+AA000004 BTK 26-11-12 00 Create reftables     table
+AA000005 BTK 26-11-12 00 Create users         table
+AA000006 BTK 26-11-12 00 Create usergroups    table
+AA000007 BTK 26-11-12 00 Create applications  table
+AA000008 BTK 26-11-12 00 Create versions      table
+AA000009 BTK 26-11-12 00 Create environments  table
+AA000010 BTK 26-11-12 00 Create variables     table
+AA000011 BTK 26-11-12 00 Create templates     table
+AA000012 BTK 26-11-12 00 Create templaterevs  table
+AA000013 BTK 26-11-12 00 Create templatelines table
+AA000014 BTK 26-11-12 00 Create deployments   table
+AA000015 BTK 26-11-12 00 Create depljobs      table
+AA000016 BTK 26-11-12 00 Create jcllines      table
+AA000017 BTK 26-11-12 00 Create jobruns       table
+AA000018 BTK 26-11-12 00 Create jobsteps      table
+AA000019 BTK 26-11-12 00 Create spoolfiles    table
+AA000020 BTK 26-11-12 00 Create spoollines    table
+AA000021 BTK 26-11-12 00 Create approvals     table
+AA000022 BTK 26-11-12 00 Create deplevents    table
+AA000023 BTK 26-11-12 00 Create mailqueue     table
+SETTINGS BTK 26-11-12 00 Every SETTINGS entry in one member, rerunnable
+SEEDDATA BTK 26-11-12 00 Seed data for iteration 1: allowlists and a
+                      demo application
+SETTINGS BTK 26-11-13 01 SCHEDUSR, the userid of the scheduler (it. 2)
+SEEDDATA BTK 26-11-13 01 The demo PRD needs two approvals
+SEEDITR2 BTK 26-11-13 00 The demo PRD needs two approvals, for an
+                      environment seeded in iteration 1
+SETTINGS BTK 26-11-14 02 It. 3: no CICS writer. It. 4: where the
+                      result step finds LWD's REST API, not DB2
+ALTITR4  BTK 26-11-14 00 ENVIRONMENTS.EXECNODE, for a table created
+                      before iteration 4

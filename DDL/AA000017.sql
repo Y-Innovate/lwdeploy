@@ -1,0 +1,172 @@
+-- Create jobruns table in lwd database.
+
+-- Set SQLID
+   SET CURRENT SQLID='{{SQLID}}';
+
+-- Create jobruns tablespace
+   CREATE TABLESPACE {{JOBRUNS_TBSNAME}}
+                       IN {{DBNAME}}
+                       USING STOGROUP {{STOGROUP}}
+                       PRIQTY 40 SECQTY 40
+                       ERASE  NO
+                       FREEPAGE 0 PCTFREE 5 FOR UPDATE 0
+                       GBPCACHE CHANGED
+                       TRACKMOD YES
+                       MAXPARTITIONS 254
+                       LOGGED
+                       DSSIZE 4 G
+                       SEGSIZE 4
+                       BUFFERPOOL BP0
+                       LOCKSIZE ANY
+                       LOCKMAX SYSTEM
+                       CLOSE YES
+                       COMPRESS NO
+                       CCSID      UNICODE
+                       DEFINE YES
+                       MAXROWS 255
+                       INSERT ALGORITHM 0;
+
+-- Create jobruns table
+   CREATE TABLE {{SCHEMA}}.{{JOBRUNS_TBNAME}}
+      (RUNID         INTEGER NOT NULL,
+       DEPLID        INTEGER NOT NULL,
+       JOBNO         SMALLINT NOT NULL,
+       JOBNAME       GRAPHIC(8) NOT NULL,
+       RUNSTATUS     GRAPHIC(1) NOT NULL,
+       JOBRESULT     GRAPHIC(1),
+       JESJOBID      GRAPHIC(8),
+       SUBMITTEDDATE TIMESTAMP,
+       ENDEDDATE     TIMESTAMP,
+       JOBRC         SMALLINT,
+       ABENDCODE     GRAPHIC(5),
+       JOBMESSAGE    VARGRAPHIC(72),
+       OUTPUTSTATUS  GRAPHIC(1) NOT NULL,
+       JOBHASH       BINARY(32),
+       CREATEDBY     GRAPHIC(8) NOT NULL,
+       CREATEDDATE   TIMESTAMP NOT NULL,
+       UPDATEDBY     GRAPHIC(8) NOT NULL,
+       UPDATEDDATE   TIMESTAMP NOT NULL,
+       CONSTRAINT JOBRUNSKEY
+       PRIMARY KEY (RUNID))
+      IN {{DBNAME}}.{{JOBRUNS_TBSNAME}}
+      PARTITION BY SIZE
+      AUDIT NONE
+      DATA CAPTURE NONE
+      CCSID      UNICODE
+      NOT VOLATILE
+      APPEND NO;
+
+-- Create jobruns index for primary key
+   CREATE UNIQUE INDEX {{SCHEMA}}.{{JOBRUNS_IXNAME1}}
+      ON {{SCHEMA}}.{{JOBRUNS_TBNAME}}
+      (RUNID ASC)
+     USING STOGROUP {{STOGROUP}}
+     PRIQTY -1 SECQTY -1
+     ERASE  NO
+     FREEPAGE 0 PCTFREE 10
+     GBPCACHE CHANGED
+     NOT CLUSTER
+     COMPRESS NO
+     INCLUDE NULL KEYS
+     BUFFERPOOL BP0
+     CLOSE NO
+     COPY NO
+     DEFER NO
+     DEFINE YES
+     PIECESIZE 2 G;
+
+-- Create jobruns unique index on JOBNAME
+   CREATE UNIQUE INDEX {{SCHEMA}}.{{JOBRUNS_IXNAME2}}
+      ON {{SCHEMA}}.{{JOBRUNS_TBNAME}}
+      (JOBNAME ASC)
+     USING STOGROUP {{STOGROUP}}
+     PRIQTY -1 SECQTY -1
+     ERASE  NO
+     FREEPAGE 0 PCTFREE 10
+     GBPCACHE CHANGED
+     NOT CLUSTER
+     COMPRESS NO
+     INCLUDE NULL KEYS
+     BUFFERPOOL BP0
+     CLOSE NO
+     COPY NO
+     DEFER NO
+     DEFINE YES
+     PIECESIZE 2 G;
+
+-- Create jobruns index on DEPLID, JOBNO
+   CREATE INDEX {{SCHEMA}}.{{JOBRUNS_IXNAME3}}
+      ON {{SCHEMA}}.{{JOBRUNS_TBNAME}}
+      (DEPLID ASC,
+       JOBNO  ASC)
+     USING STOGROUP {{STOGROUP}}
+     PRIQTY -1 SECQTY -1
+     ERASE  NO
+     FREEPAGE 0 PCTFREE 10
+     GBPCACHE CHANGED
+     NOT CLUSTER
+     COMPRESS NO
+     INCLUDE NULL KEYS
+     BUFFERPOOL BP0
+     CLOSE NO
+     COPY NO
+     DEFER NO
+     DEFINE YES
+     PIECESIZE 2 G;
+
+-- Create jobruns index on RUNSTATUS, SUBMITTEDDATE
+   CREATE INDEX {{SCHEMA}}.{{JOBRUNS_IXNAME4}}
+      ON {{SCHEMA}}.{{JOBRUNS_TBNAME}}
+      (RUNSTATUS     ASC,
+       SUBMITTEDDATE ASC)
+     USING STOGROUP {{STOGROUP}}
+     PRIQTY -1 SECQTY -1
+     ERASE  NO
+     FREEPAGE 0 PCTFREE 10
+     GBPCACHE CHANGED
+     NOT CLUSTER
+     COMPRESS NO
+     INCLUDE NULL KEYS
+     BUFFERPOOL BP0
+     CLOSE NO
+     COPY NO
+     DEFER NO
+     DEFINE YES
+     PIECESIZE 2 G;
+
+-- Create jobruns index on OUTPUTSTATUS, ENDEDDATE
+   CREATE INDEX {{SCHEMA}}.{{JOBRUNS_IXNAME5}}
+      ON {{SCHEMA}}.{{JOBRUNS_TBNAME}}
+      (OUTPUTSTATUS ASC,
+       ENDEDDATE    ASC)
+     USING STOGROUP {{STOGROUP}}
+     PRIQTY -1 SECQTY -1
+     ERASE  NO
+     FREEPAGE 0 PCTFREE 10
+     GBPCACHE CHANGED
+     NOT CLUSTER
+     COMPRESS NO
+     INCLUDE NULL KEYS
+     BUFFERPOOL BP0
+     CLOSE NO
+     COPY NO
+     DEFER NO
+     DEFINE YES
+     PIECESIZE 2 G;
+
+-- Create foreign key on DEPLID, JOBNO
+   ALTER TABLE {{SCHEMA}}.{{JOBRUNS_TBNAME}}
+     FOREIGN KEY JOBRUN_FK1 (DEPLID, JOBNO)
+     REFERENCES {{SCHEMA}}.{{DEPLJOBS_TBNAME}}
+       (DEPLID, JOBNO)
+     ON DELETE RESTRICT ENFORCED;
+
+-- Create sequence for RUNID. The key is needed before the insert,
+-- because the job name contains it (JOBPRFX + RUNID in base 36).
+   CREATE SEQUENCE {{SCHEMA}}.{{JOBRUNS_SEQNAME}}
+      AS INTEGER
+      START WITH 1 INCREMENT BY 1
+      MINVALUE 1 MAXVALUE 2147483647
+      NO CYCLE CACHE 20 NO ORDER;
+
+   COMMIT;

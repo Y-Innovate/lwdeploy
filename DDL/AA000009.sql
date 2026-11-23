@@ -1,0 +1,157 @@
+-- Create environments table in lwd database.
+
+-- Set SQLID
+   SET CURRENT SQLID='{{SQLID}}';
+
+-- Create environments tablespace
+   CREATE TABLESPACE {{ENVIRONMENTS_TBSNAME}}
+                       IN {{DBNAME}}
+                       USING STOGROUP {{STOGROUP}}
+                       PRIQTY 40 SECQTY 40
+                       ERASE  NO
+                       FREEPAGE 0 PCTFREE 5 FOR UPDATE 0
+                       GBPCACHE CHANGED
+                       TRACKMOD YES
+                       MAXPARTITIONS 254
+                       LOGGED
+                       DSSIZE 4 G
+                       SEGSIZE 4
+                       BUFFERPOOL BP0
+                       LOCKSIZE ANY
+                       LOCKMAX SYSTEM
+                       CLOSE YES
+                       COMPRESS NO
+                       CCSID      UNICODE
+                       DEFINE YES
+                       MAXROWS 255
+                       INSERT ALGORITHM 0;
+
+-- Create environments table
+   CREATE TABLE {{SCHEMA}}.{{ENVIRONMENTS_TBNAME}}
+      (ENVID            INTEGER NOT NULL GENERATED ALWAYS
+          AS IDENTITY
+             (START WITH 1, INCREMENT BY 1, CACHE 20, NO CYCLE,
+              NO ORDER, MAXVALUE 2147483647, MINVALUE 1),
+       APPID            INTEGER NOT NULL,
+       ENVCODE          GRAPHIC(8) NOT NULL,
+       ENVNAME          VARGRAPHIC(60) NOT NULL,
+       DESCRIPTION      VARGRAPHIC(1000),
+       SORTORDER        SMALLINT NOT NULL,
+       PROMOGATE        GRAPHIC(1) NOT NULL,
+       DEPLOYUSER       GRAPHIC(8),
+       APPROVALREQ      GRAPHIC(1) NOT NULL,
+       APPROVERGROUP    GRAPHIC(8),
+       APPROVALCOUNT    SMALLINT NOT NULL,
+       DEPLOYERGROUP    GRAPHIC(8),
+       ACTIVEDEPLID     INTEGER,
+       CURRENTDEPLID    INTEGER,
+       CURRENTVERSIONID INTEGER,
+       ENVSTATE         GRAPHIC(1) NOT NULL,
+       CREATEDBY        GRAPHIC(8) NOT NULL,
+       CREATEDDATE      TIMESTAMP NOT NULL,
+       UPDATEDBY        GRAPHIC(8) NOT NULL,
+       UPDATEDDATE      TIMESTAMP NOT NULL,
+       EXECNODE         GRAPHIC(8),
+       CONSTRAINT ENVIRONMENTSKEY
+       PRIMARY KEY (ENVID))
+      IN {{DBNAME}}.{{ENVIRONMENTS_TBSNAME}}
+      PARTITION BY SIZE
+      AUDIT NONE
+      DATA CAPTURE NONE
+      CCSID      UNICODE
+      NOT VOLATILE
+      APPEND NO;
+
+-- Create environments index for primary key
+   CREATE UNIQUE INDEX {{SCHEMA}}.{{ENVIRONMENTS_IXNAME1}}
+      ON {{SCHEMA}}.{{ENVIRONMENTS_TBNAME}}
+      (ENVID ASC)
+     USING STOGROUP {{STOGROUP}}
+     PRIQTY -1 SECQTY -1
+     ERASE  NO
+     FREEPAGE 0 PCTFREE 10
+     GBPCACHE CHANGED
+     NOT CLUSTER
+     COMPRESS NO
+     INCLUDE NULL KEYS
+     BUFFERPOOL BP0
+     CLOSE NO
+     COPY NO
+     DEFER NO
+     DEFINE YES
+     PIECESIZE 2 G;
+
+-- Create environments unique index on APPID, ENVCODE
+   CREATE UNIQUE INDEX {{SCHEMA}}.{{ENVIRONMENTS_IXNAME2}}
+      ON {{SCHEMA}}.{{ENVIRONMENTS_TBNAME}}
+      (APPID   ASC,
+       ENVCODE ASC)
+     USING STOGROUP {{STOGROUP}}
+     PRIQTY -1 SECQTY -1
+     ERASE  NO
+     FREEPAGE 0 PCTFREE 10
+     GBPCACHE CHANGED
+     NOT CLUSTER
+     COMPRESS NO
+     INCLUDE NULL KEYS
+     BUFFERPOOL BP0
+     CLOSE NO
+     COPY NO
+     DEFER NO
+     DEFINE YES
+     PIECESIZE 2 G;
+
+-- Create environments index on APPID, SORTORDER
+   CREATE INDEX {{SCHEMA}}.{{ENVIRONMENTS_IXNAME3}}
+      ON {{SCHEMA}}.{{ENVIRONMENTS_TBNAME}}
+      (APPID     ASC,
+       SORTORDER ASC)
+     USING STOGROUP {{STOGROUP}}
+     PRIQTY -1 SECQTY -1
+     ERASE  NO
+     FREEPAGE 0 PCTFREE 10
+     GBPCACHE CHANGED
+     NOT CLUSTER
+     COMPRESS NO
+     INCLUDE NULL KEYS
+     BUFFERPOOL BP0
+     CLOSE NO
+     COPY NO
+     DEFER NO
+     DEFINE YES
+     PIECESIZE 2 G;
+
+-- Create environments index on CURRENTVERSIONID
+   CREATE INDEX {{SCHEMA}}.{{ENVIRONMENTS_IXNAME4}}
+      ON {{SCHEMA}}.{{ENVIRONMENTS_TBNAME}}
+      (CURRENTVERSIONID ASC)
+     USING STOGROUP {{STOGROUP}}
+     PRIQTY -1 SECQTY -1
+     ERASE  NO
+     FREEPAGE 0 PCTFREE 10
+     GBPCACHE CHANGED
+     NOT CLUSTER
+     COMPRESS NO
+     INCLUDE NULL KEYS
+     BUFFERPOOL BP0
+     CLOSE NO
+     COPY NO
+     DEFER NO
+     DEFINE YES
+     PIECESIZE 2 G;
+
+-- Create foreign key on APPID
+   ALTER TABLE {{SCHEMA}}.{{ENVIRONMENTS_TBNAME}}
+     FOREIGN KEY ENVIRO_FK1 (APPID)
+     REFERENCES {{SCHEMA}}.{{APPLICATIONS_TBNAME}}
+       (APPID)
+     ON DELETE RESTRICT ENFORCED;
+
+-- Create foreign key on CURRENTVERSIONID
+   ALTER TABLE {{SCHEMA}}.{{ENVIRONMENTS_TBNAME}}
+     FOREIGN KEY ENVIRO_FK2 (CURRENTVERSIONID)
+     REFERENCES {{SCHEMA}}.{{VERSIONS_TBNAME}}
+       (VERSIONID)
+     ON DELETE RESTRICT ENFORCED;
+
+   COMMIT;
