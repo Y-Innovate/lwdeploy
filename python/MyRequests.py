@@ -2,6 +2,15 @@ import json
 
 from Globals import Globals
 
+# Seconds to wait for a connection, and for a response (parsing a spec or
+# storing a large file on LWW can take a while)
+TIMEOUT = (10, 300)
+
+# The status code LWW returns for an expired bearer token: the request is
+# sent once more with a new token. Other errors (400, 403, 409, ...) are
+# returned as they are, so a failing POST isn't sent twice.
+RETRY_WITH_NEW_TOKEN = (401,)
+
 class MyRequests:
     @classmethod
     def getBearerToken(cls, uri):
@@ -25,12 +34,12 @@ class MyRequests:
             print("POST " + requrl)
 
         if (isinstance(Globals.myCreds, tuple)):
-            resppost = Globals.s.post(requrl, data=json.dumps(data))
+            resppost = Globals.s.post(requrl, data=json.dumps(data), timeout=TIMEOUT)
         else:
             headers = {
                 'Content-Type': 'application/x-www-form-urlencoded'
             }
-            resppost = Globals.s.post(requrl, data=data, headers=headers)
+            resppost = Globals.s.post(requrl, data=data, headers=headers, timeout=TIMEOUT)
 
         if (resppost.status_code == 200):
             if Globals.myDebug > 0:
@@ -45,7 +54,7 @@ class MyRequests:
             else:
                 raise Exception('unknown response')
         else:
-            raise Exception('status code ' + str(resppost.status_code))
+            raise Exception(f"getting a token from {requrl}: status code {resppost.status_code} {resppost.text[:500]}")
     
     @classmethod
     def doit(cls, method, requrl, data = None, files = None):
@@ -59,14 +68,14 @@ class MyRequests:
                 headers = {'Authorization': f"Bearer {Globals.myBearer}"}
 
                 if data != None:
-                    resp = Globals.s.request(method, requrl, headers=headers, data=datajson)
+                    resp = Globals.s.request(method, requrl, headers=headers, data=datajson, timeout=TIMEOUT)
                 else:
                     if files != None:
-                        resp = Globals.s.request(method, requrl, headers=headers, files=files)
+                        resp = Globals.s.request(method, requrl, headers=headers, files=files, timeout=TIMEOUT)
                     else:
-                        resp = Globals.s.request(method, requrl, headers=headers)
+                        resp = Globals.s.request(method, requrl, headers=headers, timeout=TIMEOUT)
 
-                if resp.status_code < 400 or resp.status_code >= 500 or resp.status_code == 404 or i > 0:
+                if resp.status_code not in RETRY_WITH_NEW_TOKEN or i > 0:
                     break
                 else:
                     if Globals.myDebug > 0:
@@ -74,12 +83,12 @@ class MyRequests:
                     cls.getBearerToken(Globals.uri)
         else:
             if data != None:
-                resp = Globals.s.request(method, requrl, auth=Globals.myCreds, data=datajson)
+                resp = Globals.s.request(method, requrl, auth=Globals.myCreds, data=datajson, timeout=TIMEOUT)
             else:
                 if files != None:
-                    resp = Globals.s.request(method, requrl, auth=Globals.myCreds, files=files)
+                    resp = Globals.s.request(method, requrl, auth=Globals.myCreds, files=files, timeout=TIMEOUT)
                 else:
-                    resp = Globals.s.request(method, requrl, auth=Globals.myCreds)
+                    resp = Globals.s.request(method, requrl, auth=Globals.myCreds, timeout=TIMEOUT)
         
         return resp
 

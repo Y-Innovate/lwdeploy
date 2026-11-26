@@ -1,4 +1,4 @@
-# Copy to runtimeTargets.yaml and fill in.
+# Copy to runtimeTargets.yaml (gitignored) and fill in. Read by runtimeTarget.py.
 # Run: python python/uploadLWW.py [target]     (--list shows the targets,
 # --dry-run shows what would change, --keep keeps files on LWW that aren't here)
 

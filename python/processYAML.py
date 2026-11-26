@@ -1,82 +1,31 @@
-import base64
-import requests
+# Registers the LWD API with LWW: uploads the spec, parses it with path
+# prefix /lwdeploy/API/v1 and installs every method of every path.
+#
+# python processYAML.py [target] [--list] [--debug]
+#   Host and sign-in come from runtimeTargets.yaml (runtimeTarget.py); the
+#   spec is read on the host from the target's remoteOASDir.
 import json
-import os
+import runtimeTarget
 import sys
-import yaml
-import argparse
 
-from getpass import getpass
-from pathlib import Path
 from urllib.parse import quote
 from Globals import Globals
 from MyRequests import MyRequests
 
-# Hosts and sign-in details live in runtimeTargets.yaml next to this script (gitignored),
-# see runtimeTargets.example.yaml. Usage: python python/processYAML.py [target] [--list] [--debug]
+API_YAML = "lwd_1.0.0.yaml"
+API_PATH_PREFIX = "/lwdeploy/API/v1"
 
-scriptDir = Path(__file__).resolve().parent
-
-parser = argparse.ArgumentParser(description="Upload to an LWWAPI server")
-parser.add_argument("target", nargs="?", help="name of the target in the config file (default: the config's 'default')")
-parser.add_argument("-c", "--config", default=str(scriptDir / "runtimeTargets.yaml"), help="config file (default: %(default)s)")
-parser.add_argument("-l", "--list", action="store_true", help="list the configured targets and exit")
-parser.add_argument("-d", "--debug", action="count", default=0, help="print requests and responses")
+parser = runtimeTarget.argParser("Register the LWD API with an LWWAPI server")
 args = parser.parse_args()
 
-if not os.path.isfile(args.config):
-    sys.exit(f"Config file {args.config} not found; copy runtimeTargets.example.yaml to it and fill it in")
+target = runtimeTarget.useTarget(args, "/LWWAPI/API")
 
-with open(args.config, "r") as configFile:
-    config = yaml.safe_load(configFile) or {}
+if not target.get("remoteOASDir"):
+    sys.exit(f"Target '{target['name']}' has no remoteOASDir")
 
-targets = config.get("targets") or {}
+print(f"Registering {API_YAML} on {target['name']} ({target['host']})")
 
-if args.list:
-    for name, t in targets.items():
-        marker = " (default)" if name == config.get("default") else ""
-        print(f"{name}{marker}: {t.get('host')} [{t.get('auth', 'password')}]")
-    sys.exit(0)
-
-targetName = args.target or config.get("default")
-
-if not targetName:
-    sys.exit(f"No target given and no default in {args.config}; choose one of: {', '.join(targets)}")
-
-if targetName not in targets:
-    sys.exit(f"Unknown target '{targetName}'; choose one of: {', '.join(targets)}")
-
-target = targets[targetName]
-
-if not target.get("host"):
-    sys.exit(f"Target '{targetName}' has no host")
-
-Globals.myHost = target["host"].rstrip("/")
-Globals.myBasepath = ""
-Globals.pathPrefix = "/LWWAPI/API"
-Globals.myDebug = args.debug
-Globals.s = requests.sessions.Session()
-# Extra headers sent with every request, e.g. a Cloudflare Access cookie
-Globals.s.headers.update(target.get("headers") or {})
-
-auth = target.get("auth", "password")
-
-if auth == "entra":
-    # Client credentials from a JSON file: client_id, client_secret, scope, grant_type
-    credsFile = os.path.expanduser(target.get("credsFile", "~/.creds"))
-
-    with open(credsFile, "r") as credfile:
-        Globals.myCreds = json.load(credfile)
-
-    MyRequests.getBearerToken(target["tokenUrl"])
-elif auth == "password":
-    userid = target.get("userid") or input("Give your userid: ")
-    passwd = getpass(f"Give the password of {userid}: ")
-    Globals.myCreds = (userid, passwd)
-
-    MyRequests.getBearerToken(target.get("tokenPath", "/LWWAPI/API/token"))
-else:
-    sys.exit(f"Target '{targetName}' has unknown auth '{auth}' (use 'password' or 'entra')")
+runtimeTarget.signIn(target)
 
 def getAPIPaths(idAPI):
     # LWW returns at most 20 paths per call; APIPath_start asks for the next page
@@ -115,7 +64,7 @@ def getAPIPaths(idAPI):
 
 def doStuff():
     data = {}
-    data['YAMLName'] = f"{target.get('remoteOASDir')}/lwd_1.0.0.yaml"
+    data['YAMLName'] = f"{target['remoteOASDir'].rstrip('/')}/{API_YAML}"
 
     resppost = MyRequests.post(f"{Globals.pathPrefix}/APIYAML", data)
 
@@ -126,7 +75,7 @@ def doStuff():
 
         data = {}
         data['ID_APIYAML'] = myYAML['ID_APIYAML']
-        data['APIPathPrefix'] = '/lwdeploy/API/v1'
+        data['APIPathPrefix'] = API_PATH_PREFIX
 
         resppost = MyRequests.post(f"{Globals.pathPrefix}/APIYAMLParse", data)
 
