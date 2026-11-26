@@ -104,7 +104,8 @@ $(loaddb2tgts) : $(srcloadlib)($%)
 -              MEMBER($%) PRINTSUCCESS(NO)
 - CALL BIND SYSTEM(DBY1) PACKAGE(LWD$(lwddb)) MEMBER($%)+
 -           OWNER(LWD$(lwddb)) QUALIFIER(LWD$(lwddb))+
--           LIBRARY('$(tgtdbrmlib)')
+-           LIBRARY('$(tgtdbrmlib)')+
+-           VALIDATE(BIND)
 
 #* Allocate LRECL=80 RECFM=FB data sets
 $(recfmFB80) :
