@@ -1,8 +1,11 @@
-# Uploads LWWAdmin/ to the /lwdeploy folder of LWW's file system, through the LWW
-# Admin API. A copy of uploadLWW.py of ctfdlww.
+# Uploads LWWAdmin/ to the application's folder in LWW's file system,
+# through the LWW Admin API. The folder, its transaction and default page,
+# and the files to keep on LWW are in lwwApp.yaml next to this script; a
+# target in runtimeTargets.yaml can overrule them. This script has nothing
+# of its own application in it, so other LWW apps can use it as it is.
 #
-# python uploadLWW.py
-#   Creates /lwdeploy (folder ID LWD_FOLDER_ID) if it doesn't exist yet, then
+# python uploadLWW.py [target] [--list] [--debug] [--keep] [--dry-run]
+#   Creates the folder (folder.id) if it doesn't exist yet, then
 #   creates the folders and sends the files of LWWAdmin/ that are new or
 #   changed: committed files whose git hash differs from the "custom" field
 #   on LWW, and files that are added, changed or untracked in the working
@@ -11,7 +14,7 @@
 #   files, also when the deletion is committed already, and the hashed files
 #   of earlier builds in assets/, also builds that were never committed.
 #   Subfolders on LWW that aren't here are reported, not deleted, and so
-#   are the files of KEEP_ON_LWW and of the target's "keep:" list in
+#   are the files of "keep:" in lwwApp.yaml and in the target in
 #   runtimeTargets.yaml: files that belong on LWW but not in git, such as
 #   the single sign-on configuration.
 #   Host and sign-in come from runtimeTargets.yaml (runtimeTarget.py).
@@ -19,15 +22,14 @@
 # Options: [target] --list --debug, and
 #   --keep      don't delete files on LWW that aren't in LWWAdmin/
 #   --dry-run   only show what would be created, sent and deleted
-#   --rename    give the existing folder its new name (/lwd became
-#               /lwdeploy on 2026-11-15)
+#   --rename    give the existing folder (folder.id) the name folder.name;
+#               without it the upload stops when the folder on LWW has
+#               another name (lwdeploy: /lwd became /lwdeploy)
 #
 # A hidden file .<name> next to the file or folder <name> overrules fields of
 # the payload: "newFile:" for files, "newFolder:" for folders. The files in
 # LWWAdmin/API/v1 are placeholders, one per API path, whose .<name> sets the
-# CICS transaction of the path: LWDU user, LWDA admin, LWDQ scheduler, LWDJ result
-# step, and LWW's own LWBL
-# for /token.
+# CICS transaction of the path (docs/04-api.md, Access).
 import base64
 import json
 import os
@@ -35,48 +37,40 @@ import re
 import subprocess
 import sys
 import yaml
+import lwwApp
 import runtimeTarget
 
 from Globals import Globals
 from MyRequests import MyRequests
 
-parser = runtimeTarget.argParser("Upload LWWAdmin/ to the /lwdeploy folder of an LWWAPI server")
+parser = runtimeTarget.argParser("Upload LWWAdmin/ to the application's folder on an LWWAPI server")
 parser.add_argument("-k", "--keep", action="store_true", help="don't delete files on LWW that aren't in LWWAdmin/")
 parser.add_argument("-n", "--dry-run", action="store_true", help="only show what would be created, sent and deleted")
-parser.add_argument("--rename", action="store_true", help="give an existing folder LWD_FOLDER_ID the name LWD_FOLDER_NAME (it was /lwd until 2026-11-15)")
+parser.add_argument("--rename", action="store_true", help="give the existing folder folder.id the name folder.name of lwwApp.yaml")
 args = parser.parse_args()
 
 target = runtimeTarget.useTarget(args, "/LWWAPI/API")
 
 print(f"Uploading to {target['name']} ({target['host']}){' - dry run, nothing changes' if args.dry_run else ''}")
 
-runtimeTarget.signIn(target)
+app = lwwApp.load(target)
+folder = app["folder"]
 
-# The /lwdeploy folder in the root of LWW's file system
-LWD_FOLDER_ID = "LD000000"
-LWD_FOLDER_NAME = "lwdeploy"
-# The /lwdeploy folder itself runs under LWD's user transaction LWDU, as the
-# route folders of the web UI do (their .name files). What must load before
-# sign-in has its own transaction in its .name file: LWD's public LWDP for
-# index.html, assets/ and the login folder, LWW's own LWBL for LWW's sign-in
-# pages. The API paths get LWDU, LWDA, LWDQ or LWDJ from their placeholders,
-# and LWBL for /token (docs/04-api.md, Access).
-LWD_FOLDER_TRAN = "LWDU"
-# index.html of the web UI, with this fixed ID in LWWAdmin/.index.html: the
-# page /lwdeploy/ shows
-LWD_DEFAULT_PAGE_ID = "LD000001"
-# redirect_to_login.html, with this fixed ID in LWWAdmin/.redirect_to_login.html:
-# where LWW sends a request for /lwdeploy without a session, as the route
-# folders do (since 2026-11-15, when the folder moved to LWDU)
-LWD_LOGIN_REDIRECT_ID = "LD000003"
+# The folder in the root of LWW's file system; FOLDER_TRAN is the
+# transaction of the folder itself (route folders and API paths set their
+# own in their .name files); DEFAULT_PAGE_ID is index.html of the web UI,
+# with this fixed ID in LWWAdmin/.index.html
+FOLDER_ID, FOLDER_NAME, FOLDER_TRAN, DEFAULT_PAGE_ID = lwwApp.require(
+    "folder", folder, "id", "name", "transaction", "defaultPageId")
+# Where LWW sends a request for the folder without a session; optional
+LOGIN_REDIRECT_ID = folder.get("loginRedirectId")
 # Files that live on LWW only and are never deleted by the upload, although
-# LWWAdmin/ doesn't have them: they hold settings that stay out of git. More
-# per target with "keep:" (a list of paths like these) in runtimeTargets.yaml.
-KEEP_ON_LWW = {
-    f"/{LWD_FOLDER_NAME}/sso_config.json",  # LWW's single sign-on (Entra) configuration
-} | set(target.get("keep") or [])
+# LWWAdmin/ doesn't have them: paths without a leading / are in the folder
+KEEP_ON_LWW = {k if k.startswith("/") else f"/{FOLDER_NAME}/{k}" for k in app["keep"]}
 
-dir = str(runtimeTarget.scriptDir.parent / "LWWAdmin")
+dir = str(runtimeTarget.scriptDir.parent / app["sourceDir"])
+
+runtimeTarget.signIn(target)
 
 mediaTypes = {
     "js": "text/javascript",
@@ -110,8 +104,8 @@ def checkResponse(resp, allowed=()):
         print(f"{resp.status_code} {resp.text}")
 
 def lwwPath(someDir):
-    # The path on LWW of a local folder: LWWAdmin/API/v1 is /lwdeploy/API/v1
-    return f"/{LWD_FOLDER_NAME}{someDir[len(dir):]}"
+    # The path on LWW of a local folder: LWWAdmin/API/v1 is /<folder>/API/v1
+    return f"/{FOLDER_NAME}{someDir[len(dir):]}"
 
 def applyOverrides(data, path, key):
     # A hidden file .<name> next to the file or folder <name> overrules fields of the payload
@@ -411,86 +405,89 @@ neededDirs = []
 workingTreeUpdatesDirs = computeDirsList(workingTreeUpdates)
 workingTreeDeletesDirs = computeDirsList(workingTreeDeletes)
 
-respget = MyRequests.get(f"/LWWAPI/Admin/folders/{LWD_FOLDER_ID}")
+respget = MyRequests.get(f"/LWWAPI/Admin/folders/{FOLDER_ID}")
 
 if respget.status_code == 404 and args.dry_run:
-    sys.exit(f"/{LWD_FOLDER_NAME} doesn't exist yet: a dry run has nothing to compare with")
+    sys.exit(f"/{FOLDER_NAME} doesn't exist yet: a dry run has nothing to compare with")
 elif respget.status_code == 404:
-    print(f"Create dir /{LWD_FOLDER_NAME}")
+    print(f"Create dir /{FOLDER_NAME}")
 
     data = {}
-    data['folderId'] = LWD_FOLDER_ID
+    data['folderId'] = FOLDER_ID
     data['parentFolderId'] = "ROOT"
-    data['folderName'] = LWD_FOLDER_NAME
-    data['path'] = f"/{LWD_FOLDER_NAME}"
+    data['folderName'] = FOLDER_NAME
+    data['path'] = f"/{FOLDER_NAME}"
     data['generateId'] = "N"
-    data['defaultTran'] = LWD_FOLDER_TRAN
+    data['defaultTran'] = FOLDER_TRAN
 
     resppost = MyRequests.post("/LWWAPI/Admin/folders", data)
     checkResponse(resppost)
 else:
     checkResponse(respget)
 
-    # The folder was /lwd until 2026-11-15. Its name is changed only on
-    # request: whether LWW then also moves the paths of the folders and files
-    # in it is not known yet, so check the result on LWW afterwards. The
-    # field names of the GET response are a guess, taken from the request.
-    folder = respget.json()
-    oldPath = folder.get("path") or (folder.get("folderName") and f"/{folder['folderName']}")
+    # The folder may have another name on LWW, when folder.name changed. It
+    # is renamed only on request: whether LWW then also moves the paths of
+    # the folders and files in it is not known, so check the result on LWW
+    # afterwards. The field names of the GET response are taken from the
+    # request.
+    current = respget.json()
+    oldPath = current.get("path") or (current.get("folderName") and f"/{current['folderName']}")
     if not oldPath:
-        print(f"Can't tell the name of folder {LWD_FOLDER_ID} from: {respget.text[:200]}")
-    elif oldPath != f"/{LWD_FOLDER_NAME}":
+        print(f"Can't tell the name of folder {FOLDER_ID} from: {respget.text[:200]}")
+    elif oldPath != f"/{FOLDER_NAME}":
         if not args.rename or args.dry_run:
-            sys.exit(f"Folder {LWD_FOLDER_ID} is {oldPath}, not /{LWD_FOLDER_NAME}: "
+            sys.exit(f"Folder {FOLDER_ID} is {oldPath}, not /{FOLDER_NAME}: "
                      "run again with --rename (and without --dry-run) to change it")
 
-        print(f"Rename {oldPath} to /{LWD_FOLDER_NAME}")
+        print(f"Rename {oldPath} to /{FOLDER_NAME}")
 
         data = {}
-        data['folderId'] = LWD_FOLDER_ID
+        data['folderId'] = FOLDER_ID
         data['generateId'] = "N"
         data['parentFolderId'] = "ROOT"
-        data['folderName'] = LWD_FOLDER_NAME
-        data['path'] = f"/{LWD_FOLDER_NAME}"
-        data['defaultTran'] = LWD_FOLDER_TRAN
-        if folder.get('defaultWebpageId'):
-            data['defaultWebpageId'] = folder['defaultWebpageId']
-        if folder.get('loginRedirectWebpageId'):
-            data['loginRedirectWebpageId'] = folder['loginRedirectWebpageId']
+        data['folderName'] = FOLDER_NAME
+        data['path'] = f"/{FOLDER_NAME}"
+        data['defaultTran'] = FOLDER_TRAN
+        if current.get('defaultWebpageId'):
+            data['defaultWebpageId'] = current['defaultWebpageId']
+        if current.get('loginRedirectWebpageId'):
+            data['loginRedirectWebpageId'] = current['loginRedirectWebpageId']
 
-        respput = MyRequests.put(f"/LWWAPI/Admin/folders/{LWD_FOLDER_ID}", data)
+        respput = MyRequests.put(f"/LWWAPI/Admin/folders/{FOLDER_ID}", data)
         checkResponse(respput)
 
-doDir(dir, LWD_FOLDER_ID)
+doDir(dir, FOLDER_ID)
 
-# The default page of /lwdeploy can only point at index.html once that exists on
-# LWW, and the login redirect at redirect_to_login.html, so both are set after
+# The default page of the folder can only point at index.html once that
+# exists on LWW, and the login redirect at its page, so both are set after
 # the upload: when the folder doesn't have them yet, or doesn't run under
-# LWD_FOLDER_TRAN (it was LWBL until 2026-11-15). The name
-# of the transaction field in the GET response is a guess, taken from the
-# request.
+# FOLDER_TRAN (any more). The name of the transaction field in the GET
+# response is taken from the request.
 if os.path.isfile(os.path.join(dir, "index.html")) and not args.dry_run:
-    respget = MyRequests.get(f"/LWWAPI/Admin/folders/{LWD_FOLDER_ID}")
+    respget = MyRequests.get(f"/LWWAPI/Admin/folders/{FOLDER_ID}")
     checkResponse(respget)
 
     tran = re.search(r'"defaultTran"\s*:\s*"(\w*)"', respget.text)
     if tran is None:
-        print(f"Can't tell the transaction of /{LWD_FOLDER_NAME} from: {respget.text[:200]}")
-    wrongTran = tran is not None and tran.group(1) != LWD_FOLDER_TRAN
-    noRedirect = f'"{LWD_LOGIN_REDIRECT_ID}"' not in respget.text
-    if f'"{LWD_DEFAULT_PAGE_ID}"' not in respget.text or wrongTran or noRedirect:
-        print(f"Set the default page of /{LWD_FOLDER_NAME} to {LWD_DEFAULT_PAGE_ID}, "
-              f"its login redirect to {LWD_LOGIN_REDIRECT_ID}, its transaction to {LWD_FOLDER_TRAN}")
+        print(f"Can't tell the transaction of /{FOLDER_NAME} from: {respget.text[:200]}")
+    wrongTran = tran is not None and tran.group(1) != FOLDER_TRAN
+    noRedirect = LOGIN_REDIRECT_ID and f'"{LOGIN_REDIRECT_ID}"' not in respget.text
+
+    if f'"{DEFAULT_PAGE_ID}"' not in respget.text or wrongTran or noRedirect:
+        print(f"Set the default page of /{FOLDER_NAME} to {DEFAULT_PAGE_ID}, "
+              + (f"its login redirect to {LOGIN_REDIRECT_ID}, " if LOGIN_REDIRECT_ID else "")
+              + f"its transaction to {FOLDER_TRAN}")
 
         data = {}
-        data['folderId'] = LWD_FOLDER_ID
+        data['folderId'] = FOLDER_ID
         data['generateId'] = "N"
         data['parentFolderId'] = "ROOT"
-        data['folderName'] = LWD_FOLDER_NAME
-        data['path'] = f"/{LWD_FOLDER_NAME}"
-        data['defaultTran'] = LWD_FOLDER_TRAN
-        data['defaultWebpageId'] = LWD_DEFAULT_PAGE_ID
-        data['loginRedirectWebpageId'] = LWD_LOGIN_REDIRECT_ID
+        data['folderName'] = FOLDER_NAME
+        data['path'] = f"/{FOLDER_NAME}"
+        data['defaultTran'] = FOLDER_TRAN
+        data['defaultWebpageId'] = DEFAULT_PAGE_ID
+        if LOGIN_REDIRECT_ID:
+            data['loginRedirectWebpageId'] = LOGIN_REDIRECT_ID
 
-        respput = MyRequests.put(f"/LWWAPI/Admin/folders/{LWD_FOLDER_ID}", data)
+        respput = MyRequests.put(f"/LWWAPI/Admin/folders/{FOLDER_ID}", data)
         checkResponse(respput)

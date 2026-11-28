@@ -1,0 +1,42 @@
+# What this repository puts on LWW, read by uploadLWW.py and processYAML.py
+# (through lwwApp.py). The same for every LWW server; a target in
+# runtimeTargets.yaml can overrule any field of "folder" and "api" with its
+# own "folder:" and "api:" (e.g. another folder ID, when that one is taken on
+# its server), and add files to "keep" with its own "keep:".
+
+# The local folder whose contents go into the LWW folder
+sourceDir: LWWAdmin
+
+# The folder in the root of LWW's file system (/lwd until 2026-11-15:
+# uploadLWW.py --rename)
+folder:
+  id: LD000000
+  name: lwdeploy
+  # /lwdeploy itself runs under LWD's user transaction LWDU, as the route
+  # folders of the web UI do (their .name files). What must load before
+  # sign-in has its own transaction in its .name file: LWD's public LWDP for
+  # index.html, assets/ and the login folder, LWW's own LWBL for LWW's
+  # sign-in pages. The API paths get LWDU, LWDA, LWDQ or LWDJ from their
+  # placeholders, and LWBL for /token (docs/04-api.md, Access).
+  transaction: LWDU
+  # index.html of the web UI (lwdeploy-frontend), with this fixed ID in
+  # LWWAdmin/.index.html: the page /lwdeploy/ shows
+  defaultPageId: LD000001
+  # redirect_to_login.html, with this fixed ID in
+  # LWWAdmin/.redirect_to_login.html: where LWW sends a request for
+  # /lwdeploy without a session, as the route folders do
+  loginRedirectId: LD000003
+
+# Files that live on LWW only and are never deleted by the upload, although
+# sourceDir doesn't have them: they hold settings that stay out of git. Paths
+# without a leading / are inside the folder.
+keep:
+  - sso_config.json   # LWW's single sign-on (Entra) configuration
+
+# The API that processYAML.py registers
+api:
+  # The spec, read on the LWW host from the target's remoteOASDir
+  yaml: lwd_1.0.0.yaml
+  # The paths of the spec are served under this prefix; by default
+  # /<folder.name>/API/v1, where the placeholders of sourceDir/API/v1 go
+  # pathPrefix: /lwdeploy/API/v1

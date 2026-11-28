@@ -1,29 +1,18 @@
-import re
+# Renders one DDL or JCL member with the values of an environment, for
+# DEPLOY.zmake (through profileUSS.sh):
+#   python python/profileUSS.py <template dir> <template name> <env file>
+# The values come from envConfig.py: the env file, its .local.yaml on top.
 import sys
-import yaml
-from pathlib import Path
-from jinja2 import Environment, FileSystemLoader, BaseLoader
+
+from jinja2 import BaseLoader, Environment, FileSystemLoader
+
+import envConfig
 
 templatedir = sys.argv[1]
 templatename = sys.argv[2]
 envfile = sys.argv[3]
 
-with open(envfile, 'r') as prfl:
-    prfl = yaml.safe_load(prfl)
-
-# The site's own values (host names, ports, Entra IDs) are in
-# envs/<env>.local.yaml, which stays out of git; they replace those of
-# envs/<env>.yaml, which has placeholders such as <host> for them.
-localfile = Path(envfile).with_suffix('.local.yaml')
-if localfile.is_file():
-    with open(localfile, 'r') as local:
-        prfl.update(yaml.safe_load(local) or {})
-
-placeholders = sorted(k for k, v in prfl.items()
-                      if isinstance(v, str) and re.search(r'<[^<>]+>', v))
-if placeholders:
-    sys.exit(f"{templatename}: still placeholders for {', '.join(placeholders)}; "
-             f"set them in {localfile}")
+prfl = envConfig.loadFile(envfile)
 
 environment = Environment(loader=FileSystemLoader(templatedir))
 template = environment.get_template(templatename)

@@ -1,15 +1,30 @@
-import yaml
+# Submits the zmake deploy of this repository (ZMAKE/DEPLOY.zmake) to one
+# environment: renders the DDL and JCL, copies the load modules, DBRMs and
+# REXX, binds the packages and copies the tick's code to TICKDIR.
+#
+#   python python/deploy.py [target] [env] [--dry-run]
+#
+# target: a zmake target, default DEPLOY_ALL (DEPLOY_DDL: only DDL and JCL,
+# DEPLOY_TICK: only the tick's code).
+# env: t01, t03, ...; default $LWD_ENV, else t01.
+# The site's values (TGTHLQ, BUILDHLQ, VERSION, DB2SSID, PKGCOLLID, SQLID,
+# SCHEMA, TICKDIR, LWZMHLQ, job classes) come from envs/<env>.yaml and
+# envs/<env>.local.yaml (envConfig.py).
+import argparse
+import os
+import subprocess
+import sys
+import tempfile
 
 from jinja2 import Template
 from pathlib import Path
-import sys
-import os
-import tempfile
 
-template_src = '''//DEPLOY   JOB 'DEPLOY',CLASS=A,MSGCLASS=A,NOTIFY=&SYSUID
+import envConfig
+
+template_src = '''//DEPLOY   JOB 'DEPLOY',CLASS={{ jobclass }},MSGCLASS={{ msgclass }},NOTIFY=&SYSUID
 //*
 //      EXPORT SYMLIST=*
-//         SET LWZMHLQ=YINSYS.LWZM020
+//         SET LWZMHLQ={{ lwzmhlq }}
 //      JCLLIB ORDER=(&LWZMHLQ..JCL)
 //*
 //ZMAKE   EXEC PROC=ISPFMAKE,
@@ -19,54 +34,64 @@ template_src = '''//DEPLOY   JOB 'DEPLOY',CLASS=A,MSGCLASS=A,NOTIFY=&SYSUID
 //             DYNAMNBR.ZMAKE=100
 //ZMAKE.LWZMINP DD *,SYMBOLS=EXECSYS
 .USSHOME = {{ homedir }}
-env     := {{ env }}
-envl    := {{ envl }}
-srchlq  := {{ srchlq }}.{{ version }}
-tgthlq  := {{ tgthlq }}
-lwddb   := {{ lwddb }}
-gitdir  := {{ gitdir }}
-tickdir := {{ tickdir }}
+env       := {{ env }}
+envl      := {{ envl }}
+srchlq    := {{ srchlq }}.{{ version }}
+tgthlq    := {{ tgthlq }}
+db2ssid   := {{ db2ssid }}
+pkgcollid := {{ pkgcollid }}
+sqlid     := {{ sqlid }}
+schema    := {{ schema }}
+gitdir    := {{ gitdir }}
+tickdir   := {{ tickdir }}
 
 {{ zmake_file }}'''
 
-jcl_template = Template(template_src)
+parser = argparse.ArgumentParser(description="Submit the zmake deploy to an environment")
+parser.add_argument("target", nargs="?", default="DEPLOY_ALL",
+                    help="zmake target (default: %(default)s)")
+parser.add_argument("env", nargs="?", default=envConfig.DEFAULT_ENV,
+                    help="environment (default: %(default)s)")
+parser.add_argument("-n", "--dry-run", action="store_true",
+                    help="print the JCL instead of submitting it")
+args = parser.parse_args()
+
+values = envConfig.load(args.env)
+(env, buildhlq, version, tgthlq, db2ssid, pkgcollid, sqlid, schema, tickdir,
+ lwzmhlq, jobclass, msgclass) = envConfig.require(
+    values, "ENV", "BUILDHLQ", "VERSION", "TGTHLQ", "DB2SSID", "PKGCOLLID",
+    "SQLID", "SCHEMA", "TICKDIR", "LWZMHLQ", "BUILDJOBCLASS", "BUILDMSGCLASS")
 
 with open("ZMAKE/DEPLOY.zmake", "r") as file:
     zmake_file = file.read()
 
 data = {
-    "target": "DEPLOY_ALL",
+    "target": args.target,
     "homedir": Path.home(),
-    "srchlq": f"{os.getlogin()}.LWD",
-    "version": "V1",
-    "env": "T01",
-    "envl": "t01",
+    "env": env.upper(),
+    "envl": args.env.lower(),
+    "srchlq": buildhlq,
+    "version": version,
+    "tgthlq": tgthlq,
+    "db2ssid": db2ssid,
+    "pkgcollid": pkgcollid,
+    "sqlid": sqlid,
+    "schema": schema,
+    "tickdir": tickdir,
+    "lwzmhlq": lwzmhlq,
+    "jobclass": jobclass,
+    "msgclass": msgclass,
     "gitdir": os.getcwd(),
     "zmake_file": zmake_file
 }
 
-if len(sys.argv) > 1:
-    data["target"] = sys.argv[1]
-if len(sys.argv) > 2:
-    data["env"] = sys.argv[2].upper()
-    data["envl"] = sys.argv[2].lower()
-data["tgthlq"] = f"YINCIC.CPSM.{data['env']}.LWD"
-data["lwddb"] = data["env"]
+jcl = Template(template_src).render(data)
 
-# Where the scheduled tick's code goes (TICKDIR in envs/<env>.yaml, or in
-# envs/<env>.local.yaml, the site's own values, which stays out of git)
-with open(f"envs/{data['envl']}.yaml", "r") as envfile:
-    envvalues = yaml.safe_load(envfile)
-if os.path.isfile(f"envs/{data['envl']}.local.yaml"):
-    with open(f"envs/{data['envl']}.local.yaml", "r") as envfile:
-        envvalues.update(yaml.safe_load(envfile) or {})
-data["tickdir"] = envvalues["TICKDIR"]
+if args.dry_run:
+    print(jcl)
+    sys.exit(0)
 
-jcl = jcl_template.render(data)
-
-temp = tempfile.NamedTemporaryFile()
-
-with open(temp.name, "w") as file:
-    file.write(jcl)
-
-os.system(f"submit {temp.name}")
+with tempfile.NamedTemporaryFile("w", suffix=".jcl") as temp:
+    temp.write(jcl)
+    temp.flush()
+    sys.exit(subprocess.call(["submit", temp.name]))

@@ -102,8 +102,8 @@ $(loadothtgts) : $(srcloadlib)($%)
 $(loaddb2tgts) : $(srcloadlib)($%)
 - CALL IEBCOPY PDSIN($(srcloadlib)) PDSOUT($(tgtloadlib))+
 -              MEMBER($%) PRINTSUCCESS(NO)
-- CALL BIND SYSTEM(DBY1) PACKAGE(LWD$(lwddb)) MEMBER($%)+
--           OWNER(LWD$(lwddb)) QUALIFIER(LWD$(lwddb))+
+- CALL BIND SYSTEM($(db2ssid)) PACKAGE($(pkgcollid)) MEMBER($%)+
+-           OWNER($(sqlid)) QUALIFIER($(schema))+
 -           LIBRARY('$(tgtdbrmlib)')+
 -           VALIDATE(BIND)
 

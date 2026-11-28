@@ -1,6 +1,8 @@
 # Copy to runtimeTargets.yaml (gitignored) and fill in. Read by runtimeTarget.py.
-# Run: python python/uploadLWW.py [target]     (--list shows the targets,
-# --dry-run shows what would change, --keep keeps files on LWW that aren't here)
+# Run: python python/processYAML.py [target], python python/uploadLWW.py [target]
+# (--list shows the targets; uploadLWW.py: --dry-run shows what would change,
+# --keep keeps files on LWW that aren't here, --rename gives the folder the
+# name of lwwApp.yaml)
 
 default: dev
 
@@ -24,6 +26,13 @@ targets:
     # doesn't have them (/lwdeploy/sso_config.json is kept always)
     # keep:
     #   - /lwdeploy/some_local_setting.json
+    # Fields of "folder" in lwwApp.yaml that differ on this server, e.g.
+    # when another application already has folder ID LD000000 there
+    # folder:
+    #   id: LD000100
+    # Fields of "api" in lwwApp.yaml that differ on this server
+    # api:
+    #   yaml: lwd_1.0.0.yaml
 
   # Optional extra headers sent with every request, e.g. behind Cloudflare Access
   # behind-cloudflare:

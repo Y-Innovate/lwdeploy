@@ -97,8 +97,13 @@ full first-time setup; each later iteration lists what it adds. In short:
    `envs/<env>.yaml` (LWW's host and port, the Entra tenant and application
    IDs), in `envs/<env>.local.yaml` next to it. That file stays out of git;
    its values replace those of `envs/<env>.yaml`, and rendering stops when a
-   placeholder is left. On z/OS, the Python venv is `$LWD_VENV`, or else
-   `~/venv`.
+   placeholder is left. Values of your own (your build libraries `BUILDHLQ`,
+   the zmake libraries `LWZMHLQ`, ...) can go there too. `build` and
+   `python/deploy.py` read their settings from these files
+   ([python/envConfig.py](python/envConfig.py)); both take `--dry-run` to
+   print the job instead of submitting it, and the environment from `--env`
+   (deploy.py: its second argument) or `$LWD_ENV` (default `t01`). On z/OS,
+   the Python venv is `$LWD_VENV`, or else `~/venv`.
 3. Define the RACF groups and userids, render the DDL and JCL
    (`python python/deploy.py DEPLOY_DDL`), and run the DDL members in order.
 4. Build (`. ./setenv`, then `build`) and deploy (`python python/deploy.py`):
@@ -114,7 +119,11 @@ full first-time setup; each later iteration lists what it adds. In short:
 The scripts in `python/` that talk to LWW read their host and sign-in from
 `python/runtimeTargets.yaml`, which stays out of git: copy
 [runtimeTargets.example.yaml](python/runtimeTargets.example.yaml) and fill it
-in. Passwords are always asked for at run time.
+in. Passwords are always asked for at run time. Which LWW folder the web UI
+and API placeholders go to (`/lwdeploy`, its ID, transaction, default page
+and login redirect) and which API spec is registered under which path
+prefix is in [python/lwwApp.yaml](python/lwwApp.yaml); a target can
+overrule it.
 
 ## Testing
 

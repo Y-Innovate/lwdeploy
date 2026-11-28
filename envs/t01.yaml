@@ -162,10 +162,10 @@ CICSTXN_RESULT: LWDJ
 CICSGRP: GLWD{{ENV}}
 CICSLST: USRLIST
 CICSLIB: LWDLIB
-LOADLIB: YINCIC.CPSM.{{ENV}}.LWD.LOAD
+LOADLIB: '{{TGTHLQ}}.LOAD'
 # REXX of the output collector (LWDTICK) and the result step, copied
 # there by DEPLOY.zmake
-EXECLIB: YINCIC.CPSM.{{ENV}}.LWD.EXEC
+EXECLIB: '{{TGTHLQ}}.EXEC'
 # The result step calls LWD's REST API (docs/08-iteration-4.md): LWW's
 # host and port, the API's path, and the key ring with the CAs of the
 # certificates of LWW and Entra (*AUTH*/*: every CERTAUTH certificate).
@@ -197,8 +197,7 @@ SCHEDUSER: LWDSCHD
 SCHEDGROUP: YINADMIN
 # The scheduled tick (JCL/LWDTICK): python/tick.py under SCHEDUSER.
 # TICKDIR: the code, copied there by deploy.py (DEPLOY_ALL, DEPLOY_TICK):
-# writable by the deployer, readable by SCHEDUSER; a plain path, as
-# deploy.py reads it without rendering. TICKCONFIG and the credentials
+# writable by the deployer, readable by SCHEDUSER. TICKCONFIG and the credentials
 # it names: in SCHEDUSER's home, readable by SCHEDUSER only.
 TICKHOME: /u/lwdschd
 TICKDIR: /var/lwd/t01/tick
@@ -212,3 +211,13 @@ DEMOACCESSGROUP: LWDDEMO
 DEMOOWNERGROUP: LWDOWNR
 DEMOAPPROVERGROUP: LWDAPPR
 DEMOHLQ: LWDDEPL.DEMO
+# Build and deploy (python/build.py, python/deploy.py). BUILDHLQ and VERSION
+# name the build libraries: <BUILDHLQ>.<VERSION>.COBOL, .LOAD, ... USERID is
+# the userid running the script. Set your own in envs/<env>.local.yaml.
+LWZMHLQ: YINSYS.LWZM020
+BUILDHLQ: '{{USERID}}.LWD'
+VERSION: V1
+BUILDJOBCLASS: A
+BUILDMSGCLASS: A
+# Target libraries of the deploy: <TGTHLQ>.LOAD, .DBRM, .EXEC, .DDL, .JCL
+TGTHLQ: YINCIC.CPSM.{{ENV}}.LWD

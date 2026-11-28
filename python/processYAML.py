@@ -1,10 +1,14 @@
-# Registers the LWD API with LWW: uploads the spec, parses it with path
-# prefix /lwdeploy/API/v1 and installs every method of every path.
+# Registers the application's API with LWW: uploads the spec, parses it
+# with its path prefix and installs every method of every path. The spec's
+# file name (api.yaml) and the path prefix (api.pathPrefix, by default
+# /<folder.name>/API/v1) are in lwwApp.yaml next to this script; a target in
+# runtimeTargets.yaml can overrule them with its own "api:".
 #
 # python processYAML.py [target] [--list] [--debug]
 #   Host and sign-in come from runtimeTargets.yaml (runtimeTarget.py); the
 #   spec is read on the host from the target's remoteOASDir.
 import json
+import lwwApp
 import runtimeTarget
 import sys
 
@@ -12,13 +16,12 @@ from urllib.parse import quote
 from Globals import Globals
 from MyRequests import MyRequests
 
-API_YAML = "lwd_1.0.0.yaml"
-API_PATH_PREFIX = "/lwdeploy/API/v1"
-
-parser = runtimeTarget.argParser("Register the LWD API with an LWWAPI server")
+parser = runtimeTarget.argParser("Register the application's API with an LWWAPI server")
 args = parser.parse_args()
 
 target = runtimeTarget.useTarget(args, "/LWWAPI/API")
+
+API_YAML, API_PATH_PREFIX = lwwApp.require("api", lwwApp.load(target)["api"], "yaml", "pathPrefix")
 
 if not target.get("remoteOASDir"):
     sys.exit(f"Target '{target['name']}' has no remoteOASDir")
